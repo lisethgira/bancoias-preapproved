@@ -1,3 +1,22 @@
 spring:
   application:
     name: preapproved
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/bancoias
+    username: bancoias
+    password: bancoias
+  sql:
+    init:
+      mode: always
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.bancoias: DEBUG
