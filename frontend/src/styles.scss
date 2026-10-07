@@ -1,1 +1,106 @@
-/* You can add global styles to this file, and also import other style files */
+:root {
+    --bg: #f4f6f9;
+    --surface: #ffffff;
+    --text: #1c2430;
+    --muted: #5f6b7a;
+    --border: #d9dee5;
+    --primary: #0b5cad;
+    --primary-hover: #094a8c;
+    --success-bg: #e7f6ec;
+    --success: #1e7b3c;
+    --danger-bg: #fdecec;
+    --danger: #b42318;
+    --warning-bg: #fff6e0;
+    --warning: #8a5a00;
+    --info-bg: #e8f1fb;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12161c;
+      --surface: #1b2129;
+      --text: #e6e9ee;
+      --muted: #9aa5b4;
+      --border: #2e3742;
+      --primary: #4a9be8;
+      --primary-hover: #6aaeee;
+      --success-bg: #12301d;
+      --success: #6fd394;
+      --danger-bg: #3a1614;
+      --danger: #f2877d;
+      --warning-bg: #352a10;
+      --warning: #f0c060;
+      --info-bg: #15283d;
+    }
+  }
+  
+  * { box-sizing: border-box; }
+  
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  
+  h1, h2 { margin: 0 0 1rem; }
+  h2 { font-size: 1.1rem; }
+  
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem;
+  }
+  
+  label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin: 0.9rem 0 0.3rem;
+  }
+  
+  input, select {
+    width: 100%;
+    padding: 0.55rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  
+  button {
+    padding: 0.55rem 1rem;
+    border: none;
+    border-radius: 6px;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  
+    &:hover:not(:disabled) { background: var(--primary-hover); }
+    &:disabled { opacity: 0.6; cursor: not-allowed; }
+  
+    &.secondary {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid var(--primary);
+    }
+  }
+  
+  .row { display: flex; gap: 0.5rem; }
+  
+  .hint, .empty { color: var(--muted); font-size: 0.85rem; }
+  .field-error { color: var(--danger); font-size: 0.8rem; }
+  
+  .alert {
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  
+    &.error { background: var(--danger-bg); color: var(--danger); }
+    &.warning { background: var(--warning-bg); color: var(--warning); }
+  }
