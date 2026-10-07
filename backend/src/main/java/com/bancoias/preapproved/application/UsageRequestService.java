@@ -103,6 +103,8 @@ public class UsageRequestService {
     }
 
     private Instant now() {
-        return Instant.now(clock);
+        // PostgreSQL guarda microsegundos; se trunca para que la respuesta original
+        // y la de un reintento sean idénticas.
+        return Instant.now(clock).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
     }
 }
