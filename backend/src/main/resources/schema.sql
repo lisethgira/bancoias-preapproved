@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS usage_request (
     payload_hash      VARCHAR(64)    NOT NULL,
     status            VARCHAR(12)    NOT NULL,
     rejection_reason  VARCHAR(40),
-    processed_at      TIMESTAMP      NOT NULL
+    processed_at      TIMESTAMPTZ    NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_usage_request_processed_at
