@@ -153,11 +153,34 @@ Una fila afectada indica autorización; cero filas, rechazo por cupo insuficient
 
 ---
 
-## ADR-011 · RabbitMQ (opcional)
+## ADR-011 · Publicación de eventos con patrón Outbox y RabbitMQ (opcional)
 
-**Estado.** Infraestructura disponible en `docker-compose`; publicación de eventos pendiente.
+**Contexto.** Cuando una solicitud se autoriza, otros sistemas deben poder reaccionar. El riesgo es la doble escritura: guardar en PostgreSQL y publicar en RabbitMQ no son atómicos.
 
-**Diseño propuesto.** Publicar un evento `PreApprovedUsageAuthorized` en un exchange de tipo topic (`preapproved.events`) mediante el **patrón Outbox**: el evento se guarda en una tabla `outbox_event` en la misma transacción que la autorización y un publicador aparte lo envía y lo marca como publicado. Así no se pierde el evento si RabbitMQ no está disponible, ni se publica un evento de una transacción revertida. Cada evento llevaría un `eventId` para que los consumidores descarten duplicados (entrega al menos una vez).
+**Alternativas.**
+- Publicar directamente después del commit: si RabbitMQ falla, el evento se pierde aunque el cupo ya se descontó.
+- Publicar dentro de la transacción: si la transacción se revierte, ya se anunció algo que no ocurrió.
+- Patrón Outbox.
+
+**Decisión.**
+- El evento se guarda en `outbox_event` **en la misma transacción** que la autorización.
+- `OutboxPublisher` (cada 2 s) lee los pendientes, publica y solo marca `published_at` después de la **confirmación del broker** (`publisher-confirm-type: simple`, `waitForConfirmsOrDie`). Mensajes persistentes.
+- Exchange **topic** `preapproved.events` con routing key `preapproved.usage.authorized`: nuevos consumidores se suscriben creando su propia cola, sin cambios en este servicio.
+- Consumidor de ejemplo **idempotente**: registra el `eventId` en `processed_event` con `ON CONFLICT DO NOTHING`.
+- Tras 3 intentos fallidos, el mensaje va a la **DLQ** `preapproved.usage.authorized.audit.dlq` en lugar de reencolarse indefinidamente.
+- El publicador se ejecuta en el hilo del planificador de Spring, no en el event loop de WebFlux, por lo que usar `RabbitTemplate` (bloqueante) es seguro allí.
+
+**Trade-offs.**
+- Garantía **al menos una vez**: si el broker confirma pero falla la marca de publicado, el evento se reenvía. Por eso los consumidores deben ser idempotentes.
+- Latencia de hasta ~2 s por el sondeo periódico.
+- Con varias instancias, dos podrían tomar el mismo evento pendiente; se mitiga con la idempotencia del consumidor y se mejoraría con `FOR UPDATE SKIP LOCKED`.
+- La tabla outbox no se depura en esta versión.
+- El consumidor vive en el mismo servicio solo como demostración; en un caso real sería otro sistema.
+
+**Validación.**
+- `OutboxIntegrationTest`: una autorización genera exactamente un evento; un rechazo, ninguno; un reintento no genera un segundo evento; cinco reintentos simultáneos generan uno solo (el rollback de los perdedores también revierte su evento).
+- `RabbitOutboxIntegrationTest`: publicación real con Testcontainers y descarte de un mensaje duplicado.
+- Prueba manual con `docker compose`: logs de publicación y consumo, y colas visibles en la consola de RabbitMQ.
 
 ---
 

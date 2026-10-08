@@ -13,6 +13,7 @@
 4. **Generación de código base:** modelos de dominio, adaptadores R2DBC, caso de uso, API REST, componentes Angular y Dockerfiles.
 5. **Generación de pruebas:** pruebas unitarias de reglas y pruebas de integración de concurrencia e idempotencia.
 6. **Documentación:** estructura del README y de este registro, y redacción de las decisiones técnicas.
+7. **Punto opcional RabbitMQ:** diseño del patrón Outbox, topología (exchange topic, DLQ), publicador con confirmación del broker, consumidor idempotente y sus pruebas.
 
 ## Resultados aprovechados
 
@@ -27,6 +28,7 @@
 - **Pruebas manuales con `curl`:** solicitud nueva (201), reintento (200), conflicto (409) y consulta de recientes.
 - **Pruebas manuales en la interfaz:** autorización, reintento, conflicto, preaprobado bloqueado y monto cero.
 - **Revisión del código** generado antes de incorporarlo, y verificación de compilación en cada paso.
+- **RabbitMQ:** verificación manual de los logs de publicación y consumo en Docker, y de las colas en la consola de administración.
 
 ## Resultados corregidos o descartados
 
