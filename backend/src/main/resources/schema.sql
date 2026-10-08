@@ -19,3 +19,23 @@ CREATE TABLE IF NOT EXISTS usage_request (
 
 CREATE INDEX IF NOT EXISTS idx_usage_request_processed_at
     ON usage_request (processed_at DESC);
+
+-- Outbox: eventos pendientes de publicar, escritos en la misma transacción que la autorización.
+CREATE TABLE IF NOT EXISTS outbox_event (
+    id            UUID          PRIMARY KEY,
+    aggregate_id  VARCHAR(50)   NOT NULL,
+    event_type    VARCHAR(60)   NOT NULL,
+    payload       TEXT          NOT NULL,
+    created_at    TIMESTAMPTZ   NOT NULL,
+    published_at  TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_outbox_pending
+    ON outbox_event (created_at) WHERE published_at IS NULL;
+
+-- Eventos ya procesados por el consumidor, para descartar duplicados.
+CREATE TABLE IF NOT EXISTS processed_event (
+    event_id      UUID          PRIMARY KEY,
+    event_type    VARCHAR(60)   NOT NULL,
+    processed_at  TIMESTAMPTZ   NOT NULL
+);

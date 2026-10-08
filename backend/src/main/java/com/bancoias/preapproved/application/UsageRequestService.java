@@ -19,25 +19,32 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Optional;
 
+import com.bancoias.preapproved.domain.event.UsageAuthorizedEvent;
+import com.bancoias.preapproved.domain.port.OutboxRepository;
+import java.util.UUID;
+
 @Service
 public class UsageRequestService {
 
     private static final Logger log = LoggerFactory.getLogger(UsageRequestService.class);
     private static final int MAX_RECENT = 100;
 
-    private final PreApprovedRepository preApprovedRepository;
+        private final PreApprovedRepository preApprovedRepository;
     private final UsageRequestRepository usageRequestRepository;
+    private final OutboxRepository outboxRepository;
     private final UsagePolicy policy;
     private final TransactionalOperator transactionalOperator;
     private final Clock clock;
 
     public UsageRequestService(PreApprovedRepository preApprovedRepository,
                                UsageRequestRepository usageRequestRepository,
+                               OutboxRepository outboxRepository,
                                UsagePolicy policy,
                                TransactionalOperator transactionalOperator,
                                Clock clock) {
         this.preApprovedRepository = preApprovedRepository;
         this.usageRequestRepository = usageRequestRepository;
+        this.outboxRepository = outboxRepository;
         this.policy = policy;
         this.transactionalOperator = transactionalOperator;
         this.clock = clock;
@@ -78,6 +85,12 @@ public class UsageRequestService {
                         .map(reason -> Mono.just(UsageRequest.rejected(command, reason, now())))
                         .orElseGet(() -> consume(command)))
                 .flatMap(usageRequestRepository::save)
+                // Outbox: el evento se guarda en la MISMA transacción que la autorización.
+                // Si la transacción se revierte, el evento también; nunca se anuncia algo que no ocurrió.
+                .flatMap(saved -> saved.isAuthorized()
+                        ? outboxRepository.save(UsageAuthorizedEvent.from(saved, UUID.randomUUID(), now()))
+                                .thenReturn(saved)
+                        : Mono.just(saved))
                 .doOnNext(saved -> log.info("Solicitud {} procesada: {} {}",
                         saved.requestReference(), saved.status(),
                         saved.rejectionReason() == null ? "" : saved.rejectionReason()));
