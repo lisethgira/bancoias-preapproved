@@ -39,7 +39,7 @@ cd backend
 ./mvnw test          # Windows CMD/PowerShell: mvnw.cmd test
 ```
 
-Resultado esperado: `Tests run: 24, Failures: 0, Errors: 0`.
+Resultado esperado: `Tests run: 30, Failures: 0, Errors: 0`.
 
 | Suite | Pruebas | Qué demuestra |
 |---|---|---|
@@ -47,7 +47,8 @@ Resultado esperado: `Tests run: 24, Failures: 0, Errors: 0`.
 | `UsageRequestServiceIntegrationTest` | 7 | Persistencia, **concurrencia (10 solicitudes simultáneas)** e **idempotencia** contra PostgreSQL real |
 | `UsageRequestControllerIntegrationTest` | 7 | Contrato HTTP: 201, 200, 409, 400, 404 |
 | `PreapprovedApplicationTests` | 1 | Arranque del contexto |
-
+| `OutboxIntegrationTest` | 4 | El evento se escribe en la misma transacción; rechazos, reintentos y carreras no generan eventos extra |
+| `RabbitOutboxIntegrationTest` | 2 | Publicación real en RabbitMQ y consumidor que descarta duplicados |
 ---
 
 ## Desarrollo local (sin contenerizar backend y frontend)
@@ -107,7 +108,7 @@ Una solicitud **rechazada por regla de negocio** (monto ≤ 0, preaprobado inexi
 | RF05 | Referencias repetidas | ✅ | UNIQUE + hash del payload, pruebas de reintento, carrera y conflicto |
 | RF06 | Consultar por referencia y recientes | ✅ | `GET` endpoints + pruebas |
 | RF07 | Interfaz Angular | ✅ | `frontend/` integrada vía proxy (dev) y nginx (Docker) |
-| Opcional | RabbitMQ | ⏳ Ver sección de limitaciones | — |
+| Opcional | RabbitMQ | ✅ | Outbox + publicador con confirmación + consumidor idempotente + DLQ |
 
 ---
 
@@ -144,8 +145,30 @@ backend/src/main/java/com/bancoias/preapproved/
 - **Sin autenticación ni administración de preaprobados:** fuera del alcance definido por el enunciado.
 - **Consulta de recientes sin paginación:** límite máximo de 100 registros.
 - Los datos persisten entre reinicios del backend; para volver al estado inicial se usa `docker compose down -v`.
+- **Outbox con varias instancias:** dos instancias del backend podrían publicar el mismo evento; el consumidor lo tolera porque descarta duplicados por `eventId`. La mejora sería `SELECT ... FOR UPDATE SKIP LOCKED`.
+- **Sin limpieza del outbox:** los eventos publicados permanecen en la tabla; en producción se depurarían periódicamente.
 
 ---
+
+## RabbitMQ (punto opcional)
+
+Cuando una solicitud se autoriza, se publica el evento `PreApprovedUsageAuthorized`.
+
+```
+Autorización ──(misma transacción)──► outbox_event
+                                          │
+                    OutboxPublisher (cada 2 s, con publisher confirms)
+                                          ▼
+                 exchange topic: preapproved.events
+                 routing key:    preapproved.usage.authorized
+                                          ▼
+         cola preapproved.usage.authorized.audit ──► consumidor idempotente
+                                          │ tras 3 intentos fallidos
+                                          ▼
+         cola preapproved.usage.authorized.audit.dlq
+```
+
+Para verlo: envía una solicitud autorizada y revisa `docker compose logs backend | grep -i evento`, o la consola en http://localhost:15672.
 
 ## Uso de inteligencia artificial
 

@@ -13,9 +13,25 @@ spring:
     port: 5672
     username: guest
     password: guest
+    # El broker confirma cada publicación; solo entonces se marca el evento como publicado.
+    publisher-confirm-type: simple
+    listener:
+      simple:
+        # Tras agotar los reintentos, el mensaje va a la cola de mensajes fallidos (DLQ)
+        # en lugar de reencolarse indefinidamente.
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
 
 server:
   port: 8080
+
+app:
+  outbox:
+    publish-interval-ms: 2000
+    batch-size: 50
 
 logging:
   level:
