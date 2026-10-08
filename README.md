@@ -39,13 +39,13 @@ cd backend
 ./mvnw test          # Windows CMD/PowerShell: mvnw.cmd test
 ```
 
-Resultado esperado: `Tests run: 30, Failures: 0, Errors: 0`.
+Resultado esperado: `Tests run: 32, Failures: 0, Errors: 0`.
 
 | Suite | Pruebas | Qué demuestra |
 |---|---|---|
 | `UsagePolicyTest` | 9 | Reglas de negocio de RF02 (unitarias, sin infraestructura) |
 | `UsageRequestServiceIntegrationTest` | 7 | Persistencia, **concurrencia (10 solicitudes simultáneas)** e **idempotencia** contra PostgreSQL real |
-| `UsageRequestControllerIntegrationTest` | 7 | Contrato HTTP: 201, 200, 409, 400, 404 |
+| `UsageRequestControllerIntegrationTest` | 9 | Contrato HTTP: 201, 200, 409, 400, 404, 405 |
 | `PreapprovedApplicationTests` | 1 | Arranque del contexto |
 | `OutboxIntegrationTest` | 4 | El evento se escribe en la misma transacción; rechazos, reintentos y carreras no generan eventos extra |
 | `RabbitOutboxIntegrationTest` | 2 | Publicación real en RabbitMQ y consumidor que descarta duplicados |
@@ -84,6 +84,7 @@ curl -X POST http://localhost:8080/api/usage-requests \
   -H "Content-Type: application/json" \
   -d '{"requestReference":"REF-001","preApprovedId":"PRA-1001","customerId":"USR-10","amount":600000}'
 ```
+También puedes usar [`requests.http`](requests.http) con 12 escenarios listos (extensión REST Client en VS Code/Cursor, o IntelliJ).
 
 Una solicitud **rechazada por regla de negocio** (monto ≤ 0, preaprobado inexistente, cliente distinto, bloqueado o cupo insuficiente) **se procesa y se registra** con `status: REJECTED` y su razón; no es un error HTTP.
 
@@ -147,6 +148,8 @@ backend/src/main/java/com/bancoias/preapproved/
 - Los datos persisten entre reinicios del backend; para volver al estado inicial se usa `docker compose down -v`.
 - **Outbox con varias instancias:** dos instancias del backend podrían publicar el mismo evento; el consumidor lo tolera porque descarta duplicados por `eventId`. La mejora sería `SELECT ... FOR UPDATE SKIP LOCKED`.
 - **Sin limpieza del outbox:** los eventos publicados permanecen en la tabla; en producción se depurarían periódicamente.
+- **Contenedor del frontend:** `nginx:alpine` inicia como root; la mejora sería la imagen `nginx-unprivileged`. El backend ya corre con un usuario sin privilegios.
+- **Migraciones de esquema:** se usa `schema.sql` en cada arranque; en producción se usaría Flyway o Liquibase.
 
 ---
 
@@ -169,6 +172,17 @@ Autorización ──(misma transacción)──► outbox_event
 ```
 
 Para verlo: envía una solicitud autorizada y revisa `docker compose logs backend | grep -i evento`, o la consola en http://localhost:15672.
+
+## Tiempo invertido
+
+El enunciado estima 2 horas para el alcance obligatorio. El tiempo real fue:
+
+| Actividad | Tiempo aproximado |
+|---|---|
+| Análisis del enunciado e instalación del entorno (Java 21, Docker Desktop, WSL2) | 1 h |
+| Alcance obligatorio: RF01–RF07, pruebas, Docker y documentación | 2 h 30 min |
+| Punto opcional RabbitMQ | 45 min |
+| Revisión final de buenas prácticas | 30 min |
 
 ## Uso de inteligencia artificial
 
