@@ -1,0 +1,68 @@
+# Colección de peticiones para probar la API manualmente.
+# Ejecutar sobre datos limpios: docker compose down -v && docker compose up -d
+# En Cursor/VS Code requiere la extensión "REST Client"; en IntelliJ funciona sin instalar nada.
+
+@baseUrl = http://localhost:8080/api/usage-requests
+
+### 1. Solicitud válida → 201 AUTHORIZED (cupo PRA-1001 queda en 400.000)
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-001", "preApprovedId": "PRA-1001", "customerId": "USR-10", "amount": 600000}
+
+### 2. Reintento idéntico → 200, replayed=true, sin segundo descuento
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-001", "preApprovedId": "PRA-1001", "customerId": "USR-10", "amount": 600000}
+
+### 3. Misma referencia con otro valor → 409 con la solicitud original
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-001", "preApprovedId": "PRA-1001", "customerId": "USR-10", "amount": 100}
+
+### 4. Cupo insuficiente → 201 REJECTED INSUFFICIENT_AVAILABLE_AMOUNT
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-002", "preApprovedId": "PRA-1001", "customerId": "USR-10", "amount": 500000}
+
+### 5. Preaprobado bloqueado → 201 REJECTED PRE_APPROVED_NOT_ACTIVE
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-003", "preApprovedId": "PRA-1002", "customerId": "USR-10", "amount": 100000}
+
+### 6. Preaprobado de otro cliente → 201 REJECTED CUSTOMER_MISMATCH
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-004", "preApprovedId": "PRA-2001", "customerId": "USR-10", "amount": 100000}
+
+### 7. Preaprobado inexistente → 201 REJECTED PRE_APPROVED_NOT_FOUND
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-005", "preApprovedId": "PRA-9999", "customerId": "USR-10", "amount": 100000}
+
+### 8. Valor cero → 201 REJECTED INVALID_AMOUNT
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-006", "preApprovedId": "PRA-1001", "customerId": "USR-10", "amount": 0}
+
+### 9. Petición mal formada (sin valor) → 400 INVALID_REQUEST
+POST {{baseUrl}}
+Content-Type: application/json
+
+{"requestReference": "REF-HTTP-007", "preApprovedId": "PRA-1001", "customerId": "USR-10"}
+
+### 10. Consultar por referencia → 200
+GET {{baseUrl}}/REF-HTTP-001
+
+### 11. Referencia inexistente → 404
+GET {{baseUrl}}/NO-EXISTE
+
+### 12. Solicitudes recientes → 200
+GET {{baseUrl}}?limit=20
