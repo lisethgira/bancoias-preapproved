@@ -127,4 +127,22 @@ class UsageRequestControllerIntegrationTest {
                 .jsonPath("$.length()").isEqualTo(2)
                 .jsonPath("$[0].requestReference").isEqualTo("API-007");
     }
+
+    @Test
+    @DisplayName("Ruta inexistente responde 404, no 500")
+    void unknownRouteReturnsNotFound() {
+        client.get().uri("/api/no-existe").exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("Método no permitido responde 405, no 500")
+    void unsupportedMethodReturnsMethodNotAllowed() {
+        client.put().uri("/api/usage-requests").exchange()
+                .expectStatus().isEqualTo(405)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("METHOD_NOT_ALLOWED");
+    }
 }
