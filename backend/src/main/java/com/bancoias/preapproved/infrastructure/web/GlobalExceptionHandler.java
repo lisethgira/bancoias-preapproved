@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
 import org.springframework.web.server.ServerWebInputException;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
@@ -44,6 +46,34 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of("MALFORMED_REQUEST", "El cuerpo de la solicitud no es válido", List.of()));
     }
 
+    /**
+     * Excepciones que Spring ya asocia a un código HTTP: ruta inexistente (404),
+     * método no permitido (405), etc. Sin este manejador, el genérico las convertiría en 500.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex) {
+        HttpStatusCode status = ex.getStatusCode();
+        String code;
+        String message;
+        switch (status.value()) {
+            case 404 -> {
+                code = "NOT_FOUND";
+                message = "El recurso solicitado no existe";
+            }
+            case 405 -> {
+                code = "METHOD_NOT_ALLOWED";
+                message = "Método HTTP no permitido para este recurso";
+            }
+            default -> {
+                code = "HTTP_" + status.value();
+                message = "La solicitud no pudo procesarse";
+            }
+        }
+        return ResponseEntity.status(status)
+                .headers(ex.getHeaders())
+                .body(ErrorResponse.of(code, message, List.of()));
+    }
+    
     /** Cualquier otro error: no se exponen detalles internos al cliente. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleUnexpected(Exception ex) {
