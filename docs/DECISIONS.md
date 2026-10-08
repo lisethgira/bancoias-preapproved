@@ -184,10 +184,34 @@ Una fila afectada indica autorización; cero filas, rechazo por cupo insuficient
 
 ---
 
-## Supuestos
+---
 
-- `requestReference` es única de forma global (no por cliente) y permanente.
-- Una referencia rechazada también queda registrada; reenviarla con los mismos datos devuelve el mismo rechazo.
-- El monto admite como máximo 2 decimales; montos con más decimales responden `400`.
-- Los campos `requestReference`, `preApprovedId`, `customerId` y `amount` son obligatorios; su ausencia responde `400` y no se registra la solicitud.
-- La fecha de procesamiento se registra en UTC.
+## ADR-012 · Revisión de buenas prácticas previa a la entrega
+
+**Contexto.** En una revisión final, ejecutando peticiones con `curl`, se detectaron tres problemas:
+1. Las rutas inexistentes y los métodos no permitidos respondían `500`, porque el manejador genérico `@ExceptionHandler(Exception.class)` capturaba las `ResponseStatusException` de Spring.
+2. El consumidor de RabbitMQ registraba en los logs el payload completo, con el cliente y el monto.
+3. El contenedor del backend se ejecutaba como root.
+
+**Decisión.**
+1. Manejador específico para `ResponseStatusException` que respeta su código (404, 405) y conserva sus encabezados (`Allow` en el 405). Responde mensajes genéricos en lugar de `getReason()`, que puede exponer detalles internos.
+2. Los logs del consumidor registran solo el `eventId`.
+3. El backend se ejecuta con un usuario de sistema sin privilegios (`app`).
+
+**Trade-offs.** La imagen `nginx:alpine` del frontend sigue iniciando como root; la mejora sería `nginx-unprivileged`.
+
+**Validación.** Dos pruebas nuevas (`unknownRouteReturnsNotFound`, `unsupportedMethodReturnsMethodNotAllowed`), con lo que la suite queda en 32 pruebas en verde. `curl` manual confirmó `404` y `405` con el encabezado `Allow: POST,GET`, y el log del contenedor muestra `started by app`.
+
+## Supuestos y su impacto
+
+| Supuesto | Impacto |
+|---|---|
+| `requestReference` es única de forma global (no por cliente) y permanente, sin expiración. | Una referencia no puede reutilizarse, ni por otro cliente ni tiempo después. Un canal que recicle referencias recibiría `409`. |
+| Una solicitud rechazada también consume su referencia. | Reenviar la misma referencia devuelve el mismo rechazo, aunque el cupo haya cambiado después. Para intentarlo de nuevo como solicitud nueva, el canal debe generar otra referencia. |
+| Un rechazo por regla de negocio es un resultado procesado (`201` con `status: REJECTED`), no un error HTTP. | El cliente debe leer el campo `status`, no solo el código HTTP. Permite cumplir RF03: todo rechazo queda registrado. |
+| Si faltan campos obligatorios o el JSON es inválido, se responde `400` y no se registra la solicitud. | Solo las solicitudes bien formadas se consideran "procesadas" en el sentido de RF03. Sin referencia ni datos completos, no hay solicitud que conservar. |
+| El monto admite como máximo 13 enteros y 2 decimales. | Montos con más precisión responden `400`. Coincide con `NUMERIC(15,2)` y evita redondeos silenciosos en valores monetarios. |
+| Para detectar un conflicto se compara la referencia, el preaprobado, el cliente y el monto normalizado. | `600000` y `600000.00` se consideran iguales: un cambio solo de formato no es un conflicto. |
+| La fecha de procesamiento se registra en UTC. | Sin ambigüedad entre canales en distintas zonas horarias. La interfaz la muestra en la hora local del navegador. |
+| "Al iniciar no existen solicitudes" se cumple con una base de datos nueva; los datos persisten entre reinicios del backend. | Para volver al estado inicial se usa `docker compose down -v`. Las pruebas automatizadas no dependen de esto: limpian los datos antes de cada caso. |
+| La interfaz opera con datos de ejemplo (USR-10 por defecto, USR-20 seleccionable). | No hay selección dinámica de clientes ni preaprobados, porque el enunciado excluye su administración. Incluye `PRA-9999` para poder probar el caso "no existe". |
