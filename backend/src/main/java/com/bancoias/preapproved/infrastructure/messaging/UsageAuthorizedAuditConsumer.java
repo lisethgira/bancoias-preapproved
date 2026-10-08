@@ -7,7 +7,6 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Component;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -51,7 +50,7 @@ public class UsageAuthorizedAuditConsumer {
             log.info("Evento {} duplicado: se descarta", eventId);
             return;
         }
-        log.info("Auditoría registrada para el evento {}: {}", eventId,
-                new String(message.getBody(), StandardCharsets.UTF_8));
+       // Solo el identificador del evento: no se registran datos del cliente ni montos en los logs.
+        log.info("Auditoría registrada para el evento {}", eventId);
     }
 }
